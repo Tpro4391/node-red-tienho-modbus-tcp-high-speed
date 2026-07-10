@@ -1,0 +1,26 @@
+{
+  "name": "node-red-tienho-modbus-tcp-high-speed",
+  "version": "2.0.0",
+  "description": "High-speed realtime MODBUS TCP/IP node with Connection Pool and batch processing support.",
+  "main": "modbus-tcp-ip.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "TienHo",
+  "license": "MIT",
+  "dependencies": {
+    "modbus-pdu": "^1.13.0"
+  },
+  "keywords": [
+    "node-red",
+    "modbus",
+    "tcp",
+    "high-speed",
+    "connection-pool"
+  ],
+  "node-red": {
+    "nodes": {
+      "modbus-tcp-ip": "modbus-tcp-ip.js"
+    }
+  }
+}

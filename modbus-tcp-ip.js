@@ -114,11 +114,18 @@ module.exports = function (RED) {
             const ip = request.ip || request.modbus_ip || ipDefault;
             const port = request.port || request.modbus_port || portDefault;
 
+            const fcode = parseInt(request.functioncode);
+            const isRead = [1, 2, 3, 4].includes(fcode);
+            const isWriteSingle = [5, 6].includes(fcode);
+            const isWriteMultiple = [15, 16].includes(fcode);
+
             const result = {
                 ip: ip,
                 port: port,
                 address: request.address,
-                quantity: request.quantity,
+                quantity: isRead ? request.quantity : undefined,
+                value: isWriteSingle ? request.value : undefined,
+                values: isWriteMultiple ? request.values : undefined,
                 unitid: request.unitid,
                 functioncode: request.functioncode,
                 status: "error",
@@ -134,13 +141,61 @@ module.exports = function (RED) {
                 result.error = "Invalid Modbus Address";
                 return Promise.resolve(result);
             }
-            if (!request.quantity || request.quantity < 1) {
-                result.error = "Invalid Modbus Quantity";
-                return Promise.resolve(result);
-            }
             if (request.unitid === undefined || request.unitid === null) {
                 result.error = "Invalid Modbus Unit ID";
                 return Promise.resolve(result);
+            }
+
+            if (isRead) {
+                if (!request.quantity || request.quantity < 1) {
+                    result.error = "Invalid Modbus Quantity";
+                    return Promise.resolve(result);
+                }
+            } else if (isWriteSingle) {
+                if (request.value === undefined || request.value === null) {
+                    result.error = "Invalid Modbus Value for write operation";
+                    return Promise.resolve(result);
+                }
+            } else if (isWriteMultiple) {
+                if (!request.values || (Array.isArray(request.values) && request.values.length === 0)) {
+                    result.error = "Invalid Modbus Values for write multiple operation";
+                    return Promise.resolve(result);
+                }
+            } else {
+                result.error = `Unsupported function code: ${request.functioncode}`;
+                return Promise.resolve(result);
+            }
+
+            // Smart formatting for write values
+            let finalValue = request.value;
+            let finalValues = request.values;
+
+            if (fcode === 5) {
+                if (typeof finalValue === 'boolean') {
+                    finalValue = finalValue ? 1 : 0;
+                }
+                result.value = finalValue;
+            } else if (fcode === 6) {
+                if (typeof finalValue === 'number') {
+                    const buf = Buffer.alloc(2);
+                    buf.writeUInt16BE(finalValue, 0);
+                    finalValue = buf;
+                }
+                result.value = finalValue;
+            } else if (fcode === 15) {
+                if (Array.isArray(finalValues)) {
+                    finalValues = finalValues.map(v => typeof v === 'boolean' ? (v ? 1 : 0) : v);
+                }
+                result.values = finalValues;
+            } else if (fcode === 16) {
+                if (Array.isArray(finalValues) && finalValues.length > 0 && typeof finalValues[0] === 'number') {
+                    const buf = Buffer.alloc(finalValues.length * 2);
+                    for (let i = 0; i < finalValues.length; i++) {
+                        buf.writeUInt16BE(finalValues[i], i * 2);
+                    }
+                    finalValues = buf;
+                }
+                result.values = finalValues;
             }
 
             return new Promise(async (resolve) => {
@@ -160,7 +215,11 @@ module.exports = function (RED) {
                         const endTime = new Date();
                         const duration = endTime - startTime;
                         result.status = "success";
-                        result.buffer = Buffer.concat(res.response.data);
+                        if (res && res.response && res.response.data) {
+                            result.buffer = Buffer.concat(res.response.data);
+                        } else {
+                            result.buffer = Buffer.alloc(0);
+                        }
                         result.durationMs = duration;
                         resolve(result);
                     } else {
@@ -170,34 +229,54 @@ module.exports = function (RED) {
                 };
 
                 try {
-                    if (request.functioncode == 1) {
+                    if (fcode === 1) {
                         conn.readCoils({
                             address: request.address,
                             quantity: request.quantity,
                             extra: { unitId: request.unitid }
                         }, responseCallBack);
-                    } else if (request.functioncode == 2) {
+                    } else if (fcode === 2) {
                         conn.readDiscreteInputs({
                             address: request.address,
                             quantity: request.quantity,
                             extra: { unitId: request.unitid }
                         }, responseCallBack);
-                    } else if (request.functioncode == 3) {
+                    } else if (fcode === 3) {
                         conn.readHoldingRegisters({
                             address: request.address,
                             quantity: request.quantity,
                             extra: { unitId: request.unitid }
                         }, responseCallBack);
-                    } else if (request.functioncode == 4) {
+                    } else if (fcode === 4) {
                         conn.readInputRegisters({
                             address: request.address,
                             quantity: request.quantity,
                             extra: { unitId: request.unitid }
                         }, responseCallBack);
-                    } else {
-                        releaseConnection(ip, parseInt(port));
-                        result.error = `Unsupported function code: ${request.functioncode}`;
-                        resolve(result);
+                    } else if (fcode === 5) {
+                        conn.writeSingleCoil({
+                            address: request.address,
+                            value: finalValue,
+                            extra: { unitId: request.unitid }
+                        }, responseCallBack);
+                    } else if (fcode === 6) {
+                        conn.writeSingleRegister({
+                            address: request.address,
+                            value: finalValue,
+                            extra: { unitId: request.unitid }
+                        }, responseCallBack);
+                    } else if (fcode === 15) {
+                        conn.writeMultipleCoils({
+                            address: request.address,
+                            values: finalValues,
+                            extra: { unitId: request.unitid }
+                        }, responseCallBack);
+                    } else if (fcode === 16) {
+                        conn.writeMultipleRegisters({
+                            address: request.address,
+                            values: finalValues,
+                            extra: { unitId: request.unitid }
+                        }, responseCallBack);
                     }
                 } catch (err) {
                     releaseConnection(ip, parseInt(port));

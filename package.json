@@ -1,6 +1,6 @@
 {
   "name": "node-red-tienho-modbus-tcp-high-speed",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "High-speed realtime MODBUS TCP/IP node with Connection Pool and batch processing support.",
   "main": "modbus-tcp-ip.js",
   "scripts": {

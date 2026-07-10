@@ -188,12 +188,15 @@ module.exports = function (RED) {
                 }
                 result.values = finalValues;
             } else if (fcode === 16) {
-                if (Array.isArray(finalValues) && finalValues.length > 0 && typeof finalValues[0] === 'number') {
-                    const buf = Buffer.alloc(finalValues.length * 2);
-                    for (let i = 0; i < finalValues.length; i++) {
-                        buf.writeUInt16BE(finalValues[i], i * 2);
-                    }
-                    finalValues = buf;
+                if (Array.isArray(finalValues) && finalValues.length > 0) {
+                    finalValues = finalValues.map(val => {
+                        if (typeof val === 'number') {
+                            const buf = Buffer.alloc(2);
+                            buf.writeUInt16BE(val, 0);
+                            return buf;
+                        }
+                        return val;
+                    });
                 }
                 result.values = finalValues;
             }

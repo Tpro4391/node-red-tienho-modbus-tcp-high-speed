@@ -6,6 +6,8 @@ module.exports = function (RED) {
         this.ip = config.ip;
         this.port = config.port;
         this.logerror = config.logerror;
+        this.connectTimeout = parseInt(config.connectTimeout) || 3000;
+        this.idleTimeout = parseInt(config.idleTimeout) || 10000;
         var node = this;
 
         // Initialize connection pool for this node instance to avoid global state pollution
@@ -43,7 +45,7 @@ module.exports = function (RED) {
 
                 modbus.tcp.connect(port, ip, {
                     debug: null,
-                    connectTimeout: 3000
+                    connectTimeout: node.connectTimeout
                 }, (err, connection) => {
                     if (err) {
                         node.status({
@@ -112,7 +114,7 @@ module.exports = function (RED) {
                                 node.connectionPool.delete(key);
                             }
                         }
-                    }, 10000); // 10s timeout
+                    }, node.idleTimeout);
                 }
             }
         };

@@ -6,7 +6,9 @@
             name: {value:"Modbus-TCP Flexi Getter"},
             ip: {value:"192.168.0.100", type:"string"},
             port: {value:502, validate:RED.validators.number()},
-            logerror: {value:true }
+            logerror: {value:true },
+            connectTimeout: {value:3000, validate:RED.validators.number()},
+            idleTimeout: {value:10000, validate:RED.validators.number()}
         },
         inputs:1,
         outputs:1,
@@ -30,6 +32,14 @@
     <div class=form-row>
             <label for="node-input-port"><i class="icon-tag"></i>Port</label>
             <input type="text" id="node-input-port" placeholder="Port">
+    </div>
+    <div class=form-row>
+            <label for="node-input-connectTimeout"><i class="icon-time"></i> Connect Timeout (ms)</label>
+            <input type="text" id="node-input-connectTimeout" placeholder="3000">
+    </div>
+    <div class=form-row>
+            <label for="node-input-idleTimeout"><i class="icon-time"></i> Idle Timeout (ms)</label>
+            <input type="text" id="node-input-idleTimeout" placeholder="10000">
     </div>
     <div class=form-row>
             <label for="node-input-logerror"><i class="icon-tag"></i>Log Errors</label>

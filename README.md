@@ -6,11 +6,12 @@ This node acts as a Modbus TCP Master (Client) to read coils, inputs, and regist
 
 ---
 
-## Key Features in v2.0.0
+## Key Features in v2.1.2
 
-*   🚀 **High-Speed Connection Pool**: TCP connections are cached and reused by `ip:port`. Sockets automatically close after a **10-second idle timeout** to prevent PLC connection overload.
-*   ⚡ **Concurrency & Parallel Execution**: Completely free of global state. Multiple concurrent messages or multiple instances in a flow execute independently without crosstalk or socket interference.
-*   📦 **Batch Processing (Array Input)**: Pass an array of multiple request configurations in `msg.payload`. The node queries all devices in parallel using `Promise.all` and returns a corresponding array of results.
+*   🚀 **High-Speed Connection Pool**: TCP connections are cached and reused by `ip:port`. Checks raw socket status (`destroyed`, `writable`) before reuse. Sockets automatically close after a **10-second idle timeout** to prevent PLC connection overload.
+*   ⚡ **Concurrency & Intelligent Queueing**: Requests to different IP addresses run in parallel, while requests to the **same IP:Port** are executed **sequentially** to prevent network race conditions or connection resets on PLCs/gateways.
+*   📦 **Batch Processing (Array Input)**: Pass an array of multiple request configurations in `msg.payload`.
+*   🛡️ **Fast Error Propagation**: If a connection to a specific IP:Port fails, the node automatically propagates the error to all subsequent queued requests targeting the same IP:Port in the batch without wasting time reconnecting.
 *   🎯 **Standardized Output Format**: Both single and batch requests return detailed objects containing connection metadata, status (`success` or `error`), raw response buffers, errors, and response duration times in `msg.payload`.
 *   🛡️ **Robust Error Handling**: Connection failures or device exceptions do not halt your flow. The error state is safely encapsulated in the output payload, and standard Node-RED Catch Nodes are supported.
 

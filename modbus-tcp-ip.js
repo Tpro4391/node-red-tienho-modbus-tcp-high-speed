@@ -16,13 +16,21 @@ module.exports = function (RED) {
             const key = `${ip}:${port}`;
             if (node.connectionPool.has(key)) {
                 const poolEntry = node.connectionPool.get(key);
-                if (poolEntry.connection && !poolEntry.connection.destroyed) {
+                const conn = poolEntry.connection;
+                const socket = conn && conn.transport && conn.transport.stream;
+                const isDestroyed = socket ? socket.destroyed : (conn ? conn.destroyed : true);
+                const isWritable = socket ? socket.writable : true;
+
+                if (conn && !isDestroyed && isWritable) {
                     if (poolEntry.idleTimer) {
                         clearTimeout(poolEntry.idleTimer);
                         poolEntry.idleTimer = null;
                     }
                     poolEntry.refCount++;
-                    return Promise.resolve(poolEntry.connection);
+                    return Promise.resolve(conn);
+                } else {
+                    if (poolEntry.idleTimer) clearTimeout(poolEntry.idleTimer);
+                    node.connectionPool.delete(key);
                 }
             }
 
@@ -296,8 +304,78 @@ module.exports = function (RED) {
 
             if (Array.isArray(msg.payload)) {
                 try {
-                    const promises = msg.payload.map(req => executeQuery(req, node.ip, node.port));
-                    const results = await Promise.all(promises);
+                    // 1. Resolve IP/Port for each request and keep track of original index
+                    const indexedRequests = msg.payload.map((req, idx) => {
+                        const ip = req.ip || req.modbus_ip || node.ip;
+                        const port = req.port || req.modbus_port || node.port;
+                        const key = `${ip}:${port}`;
+                        return { req, idx, key, ip, port };
+                    });
+
+                    // 2. Group by key (ip:port)
+                    const groups = new Map();
+                    for (const item of indexedRequests) {
+                        if (!groups.has(item.key)) {
+                            groups.set(item.key, []);
+                        }
+                        groups.get(item.key).push(item);
+                    }
+
+                    // 3. Process each group sequentially, while different groups run in parallel
+                    const groupPromises = Array.from(groups.values()).map(async (groupItems) => {
+                        let connectionError = null;
+                        const groupResults = [];
+
+                        for (const item of groupItems) {
+                            if (connectionError) {
+                                const fcode = parseInt(item.req.functioncode);
+                                const isRead = [1, 2, 3, 4].includes(fcode);
+                                const isWriteSingle = [5, 6].includes(fcode);
+                                const isWriteMultiple = [15, 16].includes(fcode);
+
+                                const result = {
+                                    ip: item.ip,
+                                    port: item.port,
+                                    address: item.req.address,
+                                    quantity: isRead ? item.req.quantity : undefined,
+                                    value: isWriteSingle ? item.req.value : undefined,
+                                    values: isWriteMultiple ? item.req.values : undefined,
+                                    unitid: item.req.unitid,
+                                    functioncode: item.req.functioncode,
+                                    status: "error",
+                                    buffer: null,
+                                    error: connectionError
+                                };
+                                groupResults.push({ idx: item.idx, result });
+                            } else {
+                                const result = await executeQuery(item.req, node.ip, node.port);
+                                if (result.status === "error" && result.error) {
+                                    const errStr = String(result.error);
+                                    if (errStr.includes("Connection error") || 
+                                        errStr.includes("ECONNRESET") || 
+                                        errStr.includes("ECONNREFUSED") || 
+                                        errStr.includes("ETIMEDOUT") ||
+                                        errStr.includes("GatewayPathUnavailable") ||
+                                        errStr.includes("GatewayTargetDeviceFailedToRespond")) {
+                                        
+                                        connectionError = result.error;
+                                    }
+                                }
+                                groupResults.push({ idx: item.idx, result });
+                            }
+                        }
+                        return groupResults;
+                    });
+
+                    const groupsResults = await Promise.all(groupPromises);
+
+                    // 4. Reconstruct results in original index order
+                    const results = [];
+                    for (const groupRes of groupsResults) {
+                        for (const item of groupRes) {
+                            results[item.idx] = item.result;
+                        }
+                    }
                     msg.payload = results;
 
                     const successCount = results.filter(r => r.status === "success").length;

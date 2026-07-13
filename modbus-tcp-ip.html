@@ -38,5 +38,52 @@
 </script>
 
 <script type="text/x-red" data-help-name="modbus-tcp-ip">
-    <p>A simple node that converts the message payloads into all modbus-tcp-ip characters</p>
+    <p>A high-speed, robust Modbus TCP/IP node with an integrated Connection Pool and batch processing support.</p>
+    
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object | array</span></dt>
+        <dd>The configuration of the query or queries to execute.</dd>
+    </dl>
+
+    <h3>Payload properties (for Single Object)</h3>
+    <dl class="message-properties">
+        <dt>functioncode <span class="property-type">number</span></dt>
+        <dd>Modbus function code (1: Read Coils, 2: Read Discrete Inputs, 3: Read Holding Registers, 4: Read Input Registers, 5: Write Single Coil, 6: Write Single Register, 15: Write Multiple Coils, 16: Write Multiple Registers).</dd>
+        
+        <dt>address <span class="property-type">number</span></dt>
+        <dd>The start address to read or write (>= 0).</dd>
+
+        <dt>quantity <span class="property-type">number</span></dt>
+        <dd>The number of registers/coils to read (required for FC 1, 2, 3, 4).</dd>
+
+        <dt>value <span class="property-type">number | boolean</span></dt>
+        <dd>The value to write (required for FC 5, 6).</dd>
+
+        <dt>values <span class="property-type">array</span></dt>
+        <dd>Array of values/numbers to write (required for FC 15, 16).</dd>
+
+        <dt>unitid <span class="property-type">number</span></dt>
+        <dd>The Modbus unit ID / Slave ID.</dd>
+
+        <dt>modbus_ip / ip <span class="property-type">string</span></dt>
+        <dd>Optional IP address (overrides UI config).</dd>
+
+        <dt>modbus_port / port <span class="property-type">number</span></dt>
+        <dd>Optional TCP port (overrides UI config).</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object | array</span></dt>
+        <dd>Returns the detailed result object(s) containing:
+            <ul>
+                <li><code>ip</code>, <code>port</code>, <code>address</code>, <code>unitid</code>, <code>functioncode</code></li>
+                <li><code>status</code>: "success" or "error"</li>
+                <li><code>buffer</code>: Raw response buffer</li>
+                <li><code>error</code>: Error message string if failed</li>
+                <li><code>durationMs</code>: Execution response time</li>
+            </ul>
+        </dd>
+    </dl>
 </script>
